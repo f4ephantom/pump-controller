@@ -62,9 +62,11 @@ def pump_on():
     """Called when state change to pump_on has been triggered"""
 
     global PUMP_STATE, PUMP_ON_TIME
+    print("pump_on() called")
     # verify that inhibit critera are not met
     if not inhibit_pump_on():
 
+        print("pump_on state change")
         # update state variables
         PUMP_STATE = 1
         PUMP_ON_TIME = datetime.now()
@@ -85,8 +87,10 @@ def pump_off():
 
     global PUMP_STATE, PUMP_OFF_TIME
 
+    print("pump_off() called")
     # verify that inhibit critera are not met
     if not inhibit_pump_off():
+        print("pump_off state change")
 
         # update state variables
         PUMP_STATE = 0
@@ -185,6 +189,27 @@ def update_schedule():
     SCHED_PUMP_ON_TIME = select['on_time'].iloc[0]
 
 
+def debug_print_state():
+    global PUMP_STATE, FAULT_IND
+    global PUMP_ON_TIME, PUMP_OFF_TIME, INIT_TIME, CURR_TEMP
+    global SCHED_LOAD_TIME, SCHED_MIN_OFF_TIME, SCHED_PUMP_ON_TIME
+    global SCHED_TRIGGER_TEMP
+
+    print("\nState Variables:")
+    print("  PUMP_STATE: {:}".format(PUMP_STATE))
+    print("  FAULT_IND: {:}".format(FAULT_IND))
+    print("\nState-relevant Variables:")
+    print("  PUMP_ON_TIME: {:}".format(PUMP_ON_TIME))
+    print("  PUMP_OFF_TIME: {:}".format(PUMP_OFF_TIME))
+    print("  INIT_TIME: {:}".format(INIT_TIME))
+    print("  CURR_TEMP: {:}".format(CURR_TEMP))
+    print("\nSchedule Variables:")
+    print("  SCHED_LOAD_TIME: {:}".format(SCHED_LOAD_TIME))
+    print("  SCHED_MIN_OFF_TIME: {:}".format(SCHED_MIN_OFF_TIME))
+    print("  SCHED_PUMP_ON_TIME: {:}".format(SCHED_PUMP_ON_TIME))
+    print("  SCHED_TRIGGER_TEMP: {:}".format(SCHED_TRIGGER_TEMP))
+  
+
 # Iterrupt callback function
 def override_callback(channel):
     """Trigger a pump_on state change request when button pressed"""
@@ -201,7 +226,7 @@ try:
         update_schedule()
         read_temp()
 
-        print("Current temperature: {:}".format(CURR_TEMP))
+        debug_print_state()
 
         if CURR_TEMP < SCHED_TRIGGER_TEMP:
             pump_on()
