@@ -1,4 +1,5 @@
 # imports
+from __future__ import print_function
 import RPi.GPIO as GPIO
 from datetime import datetime
 import time
@@ -35,7 +36,7 @@ CURR_TEMP = None
 
 # Schedule and current value registers
 SCHED = None
-SCHED_LOAD_TIME = datetime.now()
+SCHED_LOAD_TIME = None
 SCHED_MIN_OFF_TIME = None
 SCHED_PUMP_ON_TIME = None
 SCHED_TRIGGER_TEMP = None
@@ -50,8 +51,9 @@ SCHED_TRIGGER_TEMP = None
 
 # Ensure H/W matches S/W
 def push_state():
-    GPIO.out(PIN_PUMP,PUMP_STATE)
-    GPIO.out(PIN_FLTI,FAULT_IND)
+    global PIN_PUMP, PUMP_STATE, PIN_FLTI, FAULT_IND
+    GPIO.output(PIN_PUMP,PUMP_STATE)
+    GPIO.output(PIN_FLTI,FAULT_IND)
 
 push_state()
 
@@ -59,6 +61,7 @@ push_state()
 def pump_on():
     """Called when state change to pump_on has been triggered"""
 
+    global PUMP_STATE, PUMP_ON_TIME
     # verify that inhibit critera are not met
     if not inhibit_pump_on():
 
@@ -79,6 +82,8 @@ def pump_on():
 
 def pump_off():
     """Called when state change to pump_off has been triggered"""
+
+    global PUMP_STATE, PUMP_OFF_TIME
 
     # verify that inhibit critera are not met
     if not inhibit_pump_off():
@@ -101,6 +106,8 @@ def pump_off():
 def inhibit_pump_on():
     """Return True if pump_on inhibit critera are satisfied"""
 
+    global PUMP_STATE, PUMP_OFF_TIME, SCHED_MIN_OFF_TIME
+
     # Do not reset timer or add DB entry if pump is already on
     if PUMP_STATE == 1:
         return True
@@ -122,6 +129,10 @@ def inhibit_pump_off():
 
 # Utility routines
 def read_temp():
+    """Read the temperature sensor"""
+
+    global CURR_TEMP
+
     # query the sensor
     # since I don't have a sensor yet, let's read a temporary file
     try:
@@ -141,8 +152,20 @@ def update_schedule():
        This routine will be called regularly inside the main loop 
        and not queried when individual state checks are made."""
 
+    global SCHED
+    global SCHED_LOAD_TIME
+    global SCHED_TRIGGER_TEMP 
+    global SCHED_MIN_OFF_TIME 
+    global SCHED_PUMP_ON_TIME 
+
     # if we need to reload the schedule from file
-    if SCHED == None or (datetime.now() - SCHED_LOAD_TIME).seconds > 300:
+    reload_sched = False
+    if SCHED_LOAD_TIME == None:
+        reload_sched = True
+    elif (datetime.now() - SCHED_LOAD_TIME).seconds > 300:
+        reload_sched = True
+
+    if reload_sched:
         SCHED = pd.read_csv('schedule.txt',delim_whitespace=True)
         SCHED_LOAD_TIME = datetime.now()
         SCHED['start_time'] = pd.to_datetime(SCHED['start_time'].str.strip(),
@@ -151,7 +174,7 @@ def update_schedule():
                                              format='%H:%M:%S')
 
     # find row of schedule relevent to current time
-    now = datetime.now()
+    a = datetime.now().time()
     mask = SCHED.apply(lambda row: True if row['start_time'].time() < a and 
                                row['end_time'].time() >= a else False,axis=1)
     select = SCHED[mask]
@@ -173,9 +196,12 @@ GPIO.add_event_detect(PIN_OVRR, GPIO.FALLING, callback=override_callback,
 
 # Main loopmas = SCHED.apply(lambda row: True if row['start_time'].time() < a and row['end_time'].time() >= a else False,axis=1)
 try:
+    print("Initialization Complete.  Beginning loop.")
     while True:
         update_schedule()
         read_temp()
+
+        print("Current temperature: {:}".format(CURR_TEMP))
 
         if CURR_TEMP < SCHED_TRIGGER_TEMP:
             pump_on()
@@ -186,7 +212,7 @@ try:
                 pump_off()
 
         # sleep for 30s
-        time.sleep(30)
+        time.sleep(5) 
 
 except KeyboardInterrupt:
     pass
