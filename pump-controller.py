@@ -42,12 +42,32 @@ SCHED_PUMP_ON_TIME = None
 SCHED_TRIGGER_TEMP = None
 
 # Initialize the data logging database
-# if DB exists, open it
-# https://docs.python.org/3/library/sqlite3.html
-# if DB does not exist, create DB
-# info to record in database:
-# - times of state changes
-# - times and values of temperature measurements
+DB_CONN = sqlite3.connect('database.sq3')
+DB_CUR = DB_CONN.cursor()
+
+# if DB has not been initialized, prepare it for use
+DB_CUR.execute("""
+SELECT count(name) 
+FROM sqlite_master 
+WHERE type='table' AND name='sensors'""")
+if DB_CUR.fetchone()[0] != 1:
+    DB_CUR = DB_CONN.executescript(open('schema.sql','r').read())
+
+    # populate sensor table
+    DB_CUR.execute('insert into sensors (description) values ("pipe sensor 1")')
+    DB_CUR.execute('insert into sensors (description) values ("board sensor")')
+    
+    # populate state table
+    DB_CUR.execute('insert into states (description) values ("pump off")')
+    DB_CUR.execute('insert into states (description) values ("pump on")')
+    
+    # populate trigger table
+    DB_CUR.execute('insert into triggers (description) values ("temperature")')
+    DB_CUR.execute('insert into triggers (description) values ("override")')
+    DB_CUR.execute('insert into triggers (description) values ("timeout")')
+    DB_CUR.execute('insert into triggers (description) values ("init")')
+
+    DB_CONN.commit()
 
 # Ensure H/W matches S/W
 def push_state():
@@ -55,13 +75,11 @@ def push_state():
     GPIO.output(PIN_PUMP,PUMP_STATE)
     GPIO.output(PIN_FLTI,FAULT_IND)
 
-push_state()
-
 # State change routines 
-def pump_on():
+def pump_on(trigger):
     """Called when state change to pump_on has been triggered"""
 
-    global PUMP_STATE, PUMP_ON_TIME
+    global PUMP_STATE, PUMP_ON_TIME,DB_CUR,DB_CONN
     print("pump_on() called")
     # verify that inhibit critera are not met
     if not inhibit_pump_on():
@@ -72,6 +90,12 @@ def pump_on():
         PUMP_ON_TIME = datetime.now()
 
         # add record to DB
+        try:
+            DB_CUR.execute('INSERT INTO statechanges (time,old_state,'\
+              'new_state,cause) values (?,?,?,?)',(datetime.now(),1,2,trigger))
+            DB_CONN.commit()
+        except:
+            print("ERROR: Failed to add entry to database")
 
         # push state to hardware
         push_state()
@@ -82,10 +106,10 @@ def pump_on():
     return False
 
 
-def pump_off():
+def pump_off(trigger):
     """Called when state change to pump_off has been triggered"""
 
-    global PUMP_STATE, PUMP_OFF_TIME
+    global PUMP_STATE, PUMP_OFF_TIME, DB_CUR, DB_CONN
 
     print("pump_off() called")
     # verify that inhibit critera are not met
@@ -97,6 +121,12 @@ def pump_off():
         PUMP_OFF_TIME = datetime.now()
 
         # add record to DB
+        try:
+            DB_CUR.execute('INSERT INTO statechanges (time,old_state,'\
+              'new_state,cause) values (?,?,?,?)',(datetime.now(),2,1,trigger))
+            DB_CONN.commit()
+        except:
+            print("ERROR: Failed to add entry to database")
 
         # push state to hardware
         push_state()
@@ -135,7 +165,7 @@ def inhibit_pump_off():
 def read_temp():
     """Read the temperature sensor"""
 
-    global CURR_TEMP
+    global CURR_TEMP, DB_CUR, DB_CONN
 
     # query the sensor
     # since I don't have a sensor yet, let's read a temporary file
@@ -147,6 +177,12 @@ def read_temp():
         CURR_TEMP = 0.0
 
     # add record to DB
+    try:
+        DB_CUR.execute('INSERT INTO measurements (sensor_id,time,value) '\
+          'values (?,?,?)',(1,datetime.now(),CURR_TEMP))
+        DB_CONN.commit()
+    except:
+        print("ERROR: Failed to add entry to database")
 
 
 def update_schedule():
@@ -213,7 +249,7 @@ def debug_print_state():
 # Iterrupt callback function
 def override_callback(channel):
     """Trigger a pump_on state change request when button pressed"""
-    pump_on()
+    pump_on(2)
 
 # register the interrupt pin and callback function
 GPIO.add_event_detect(PIN_OVRR, GPIO.FALLING, callback=override_callback, 
@@ -221,7 +257,10 @@ GPIO.add_event_detect(PIN_OVRR, GPIO.FALLING, callback=override_callback,
 
 # Main loopmas = SCHED.apply(lambda row: True if row['start_time'].time() < a and row['end_time'].time() >= a else False,axis=1)
 try:
+    # set state to pump_off after initialization
+    pump_off(4)
     print("Initialization Complete.  Beginning loop.")
+
     while True:
         update_schedule()
         read_temp()
@@ -229,12 +268,12 @@ try:
         debug_print_state()
 
         if CURR_TEMP < SCHED_TRIGGER_TEMP:
-            pump_on()
+            pump_on(1)
 
         if PUMP_STATE == 1:
             ontime = (datetime.now() - PUMP_ON_TIME).seconds
             if ontime > SCHED_PUMP_ON_TIME:
-                pump_off()
+                pump_off(3)
 
         # sleep for 30s
         time.sleep(5) 
@@ -242,4 +281,6 @@ try:
 except KeyboardInterrupt:
     pass
 
+DB_CUR.close()
+DB_CONN.close()
 print('Exiting on keyboard iterrupt')
