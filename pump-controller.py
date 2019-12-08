@@ -98,6 +98,8 @@ def pump_on(trigger):
         PUMP_ON_TIME = datetime.now()
 
         # add record to DB
+        # Is not working when called from interrupt because the process is 
+        # different and a new sqlite connection object is needed
         try:
             DB_CUR.execute('INSERT INTO statechanges (time,'\
               'new_state,cause) values (?,?,?)',(datetime.now(),2,trigger))
