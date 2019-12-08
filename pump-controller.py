@@ -54,18 +54,26 @@ if DB_CUR.fetchone()[0] != 1:
     DB_CUR = DB_CONN.executescript(open('schema.sql','r').read())
 
     # populate sensor table
-    DB_CUR.execute('insert into sensors (description) values ("pipe sensor 1")')
-    DB_CUR.execute('insert into sensors (description) values ("board sensor")')
+    DB_CUR.execute('insert into sensors (id,description) '\
+                   'values (1,"pipe sensor 1")')
+    DB_CUR.execute('insert into sensors (id,description) '\
+                   'values (2,"board sensor")')
     
     # populate state table
-    DB_CUR.execute('insert into states (description) values ("pump off")')
-    DB_CUR.execute('insert into states (description) values ("pump on")')
+    DB_CUR.execute('insert into states (id,description) '\
+                   'values (1,"pump off")')
+    DB_CUR.execute('insert into states (id,description) '\
+                   'values (2,"pump on")')
     
     # populate trigger table
-    DB_CUR.execute('insert into triggers (description) values ("temperature")')
-    DB_CUR.execute('insert into triggers (description) values ("override")')
-    DB_CUR.execute('insert into triggers (description) values ("timeout")')
-    DB_CUR.execute('insert into triggers (description) values ("init")')
+    DB_CUR.execute('insert into triggers (id,description) '\
+                   'values (1,"temperature")')
+    DB_CUR.execute('insert into triggers (id,description) '\
+                   'values (2,"override")')
+    DB_CUR.execute('insert into triggers (id,description) '\
+                   'values (3,"timeout")')
+    DB_CUR.execute('insert into triggers (id,description) '\
+                   'values (4,"init")')
 
     DB_CONN.commit()
 
@@ -91,8 +99,8 @@ def pump_on(trigger):
 
         # add record to DB
         try:
-            DB_CUR.execute('INSERT INTO statechanges (time,old_state,'\
-              'new_state,cause) values (?,?,?,?)',(datetime.now(),1,2,trigger))
+            DB_CUR.execute('INSERT INTO statechanges (time,'\
+              'new_state,cause) values (?,?,?)',(datetime.now(),2,trigger))
             DB_CONN.commit()
         except:
             print("ERROR: Failed to add entry to database")
@@ -122,8 +130,8 @@ def pump_off(trigger):
 
         # add record to DB
         try:
-            DB_CUR.execute('INSERT INTO statechanges (time,old_state,'\
-              'new_state,cause) values (?,?,?,?)',(datetime.now(),2,1,trigger))
+            DB_CUR.execute('INSERT INTO statechanges (time,'\
+              'new_state,cause) values (?,?,?)',(datetime.now(),1,trigger))
             DB_CONN.commit()
         except:
             print("ERROR: Failed to add entry to database")

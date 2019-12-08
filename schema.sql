@@ -30,10 +30,8 @@ CREATE TABLE measurements (
 CREATE TABLE statechanges (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  old_state INTEGER NOT NULL,
   new_state INTEGER NOT NULL,
   cause INTEGER NOT NULL,
-  FOREIGN KEY (old_state) REFERENCES states (id),
   FOREIGN KEY (new_state) REFERENCES states (id),
   FOREIGN KEY (cause) REFERENCES triggers (id)
 );
