@@ -281,6 +281,7 @@ try:
 except KeyboardInterrupt:
     pass
 
+GPIO.cleanup()
 DB_CUR.close()
 DB_CONN.close()
 print('Exiting on keyboard iterrupt')
