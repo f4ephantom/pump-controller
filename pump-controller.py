@@ -5,6 +5,7 @@ from datetime import datetime
 import time
 import sqlite3
 import pandas as pd
+import glob
 
 # set GPIO pin numbering scheme
 GPIO.setmode(GPIO.BCM)
@@ -12,7 +13,7 @@ GPIO.setmode(GPIO.BCM)
 # setup pin directions
 PIN_PUMP = 17 # Relay control (BCM 17, board 11)
 PIN_OVRR = 27 # Override switch (BCM 27, board 13)
-PIN_TEMP =  4 # Temperature sensor data (BCM 4, board 7)
+#PIN_TEMP =  4 # Temperature sensor data (BCM 4, board 7)
 PIN_FLTI = 23 # Fault LED (BCM 23, board 16)
 
 GPIO.setup(PIN_PUMP, GPIO.OUT)
@@ -20,9 +21,15 @@ GPIO.setup(PIN_OVRR, GPIO.IN)
 #GPIO.setup(PIN_TEMP, GPIO.IN) # not sure yet how to interface with this
 GPIO.setup(PIN_FLTI, GPIO.OUT)
 
-# Temperature sensor (Uses one-wire protocol...tutorial suggests BCM 4)
-# https://pinout.xyz/pinout/1_wire#
-# https://thepihut.com/blogs/raspberry-pi-tutorials/18095732-sensors-temperature-with-the-1-wire-interface-and-the-ds18b20
+# Temperature sensor (BCM 4)
+# I'm using the information here for the DS18B20 temperature sensor:
+#   https://learn.adafruit.com/adafruits-raspberry-pi-lesson-11-ds18b20-temperature-sensing/software
+#
+# this SO page had an interesting comment about the file read operation triggering a conversion, so 750ms are needed between open and read in order to get a 'current' temperature
+#   https://raspberrypi.stackexchange.com/questions/75167/ds18b20-w1-slave-file-stamp-doesnt-change
+base_dir = '/sys/bus/w1/devices/'
+device_folder = glob.glob(base_dir + '28*')[0]
+DEVICE_FILE = device_folder + '/w1_slave'
 
 # State variables
 PUMP_STATE = 0
@@ -64,6 +71,10 @@ if DB_CUR.fetchone()[0] != 1:
                    'values (1,"pump off")')
     DB_CUR.execute('insert into states (id,description) '\
                    'values (2,"pump on")')
+    DB_CUR.execute('insert into states (id,description) '\
+                   'values (3,"fault off")')
+    DB_CUR.execute('insert into states (id,description) '\
+                   'values (4,"fault on")')
     
     # populate trigger table
     DB_CUR.execute('insert into triggers (id,description) '\
@@ -165,6 +176,42 @@ def inhibit_pump_on():
     return False
 
 
+def fault_on(trigger):
+    """Set the falut indicator LED"""
+
+    # Set the state indicator
+    FAULT_IND = 1
+
+    # add record to DB
+    try:
+        DB_CUR.execute('INSERT INTO statechanges (time,'\
+          'new_state,cause) values (?,?,?)',(datetime.now(),4,trigger))
+        DB_CONN.commit()
+    except:
+        print("ERROR: Failed to add entry to database")
+
+    # push to hardware
+    push_state() 
+
+
+def fault_off(trigger):
+    """Clear the falut indicator LED"""
+
+    # Set the state indicator
+    FAULT_IND = 0
+
+    # add record to DB
+    try:
+        DB_CUR.execute('INSERT INTO statechanges (time,'\
+          'new_state,cause) values (?,?,?)',(datetime.now(),3,trigger))
+        DB_CONN.commit()
+    except:
+        print("ERROR: Failed to add entry to database")
+
+    # push to hardware
+    push_state() 
+
+
 def inhibit_pump_off():
     """Return True if pump_off inhibit critera are satisfied"""
     # At present, there are no pump_off inhibit criteria 
@@ -175,16 +222,45 @@ def inhibit_pump_off():
 def read_temp():
     """Read the temperature sensor"""
 
-    global CURR_TEMP, DB_CUR, DB_CONN
+    global CURR_TEMP, DB_CUR, DB_CONN, DEVICE_FILE, FAULT_IND
 
     # query the sensor
-    # since I don't have a sensor yet, let's read a temporary file
     try:
-        with open('temperature.txt','r') as ifile:
-            CURR_TEMP = float(ifile.readline().strip())
+        # since I don't have a sensor yet, let's read a temporary file
+        #with open('temperature.txt','r') as ifile:
+        #    CURR_TEMP = float(ifile.readline().strip())
 
+        with open(DEVICE_FILE,'r') as ifile:
+            time.sleep(1.00) # only needs to be 750 ms, but allow some slop
+            lines = f.readlines()
+
+        if lines[0].strip()[-3:] == 'YES':
+            equals_pos = lines[1].find('t=')
+            if equals_pos != -1:
+                temp_string = lines[1][equals_pos+2:]
+                temp_c = float(temp_string) / 1000.0
+                CURR_TEMP = temp_c * 9.0 / 5.0 + 32.0 
+                
+            else:
+                print("ERROR reading temperature.  Cannot find t=")
+                print(lines)
+                raise ValueError
+        else:
+            print("ERROR reading temperature.  Cannot find YES")
+            print(lines)
+            raise ValueError
+            
     except:
-        CURR_TEMP = 0.0
+        # If there's an error, set temperature high enough to shut off pump
+        # and set the fault indicator
+        print("ERROR reading temperature.  Cannot open file.")
+        CURR_TEMP = 200.0
+        fault_on(1)
+
+    else:
+        # check to see if we should clear fault light
+        if FAULT_IND == 1:
+            fault_off(1)
 
     # add record to DB
     try:
@@ -269,6 +345,7 @@ GPIO.add_event_detect(PIN_OVRR, GPIO.FALLING, callback=override_callback,
 try:
     # set state to pump_off after initialization
     pump_off(4)
+    fault_off(4)
     print("Initialization Complete.  Beginning loop.")
 
     while True:
