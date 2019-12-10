@@ -38,6 +38,7 @@ FAULT_IND = 0
 # State-relevant variables
 PUMP_ON_TIME = None
 PUMP_OFF_TIME = datetime.now()
+
 INIT_TIME = datetime.now()
 CURR_TEMP = None 
 
@@ -232,7 +233,7 @@ def read_temp():
 
         with open(DEVICE_FILE,'r') as ifile:
             time.sleep(1.00) # only needs to be 750 ms, but allow some slop
-            lines = f.readlines()
+            lines = ifile.readlines()
 
         if lines[0].strip()[-3:] == 'YES':
             equals_pos = lines[1].find('t=')
