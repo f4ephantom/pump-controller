@@ -11,7 +11,7 @@ import glob
 GPIO.setmode(GPIO.BCM)
 
 # setup pin directions
-PIN_PUMP = 17 # Relay control (BCM 17, board 11)
+PIN_PUMP = 16 # Relay control (BCM 17, board 11)
 PIN_OVRR = 27 # Override switch (BCM 27, board 13)
 #PIN_TEMP =  4 # Temperature sensor data (BCM 4, board 7)
 PIN_FLTI = 23 # Fault LED (BCM 23, board 16)
