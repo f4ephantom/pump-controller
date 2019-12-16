@@ -7,6 +7,9 @@ import sqlite3
 import pandas as pd
 import glob
 
+# Enable/disable screen output
+PRINT_DBG = True
+
 # set GPIO pin numbering scheme
 GPIO.setmode(GPIO.BCM)
 
@@ -48,6 +51,7 @@ SCHED_LOAD_TIME = None
 SCHED_MIN_OFF_TIME = None
 SCHED_PUMP_ON_TIME = None
 SCHED_TRIGGER_TEMP = None
+SCHED_SAMPLE_INTVL = None
 
 # Initialize the data logging database
 DB_CONN = sqlite3.connect('database.sq3')
@@ -89,6 +93,13 @@ if DB_CUR.fetchone()[0] != 1:
 
     DB_CONN.commit()
 
+# Debug print command
+def dbg_print(line):
+    global PRINT_DBG
+    if PRINT_DBG:
+        print(line)
+
+        
 # Ensure H/W matches S/W
 def push_state():
     global PIN_PUMP, PUMP_STATE, PIN_FLTI, FAULT_IND
@@ -100,11 +111,11 @@ def pump_on(trigger):
     """Called when state change to pump_on has been triggered"""
 
     global PUMP_STATE, PUMP_ON_TIME,DB_CUR,DB_CONN
-    print("pump_on() called")
+    dbg_print("pump_on() called")
     # verify that inhibit critera are not met
     if not inhibit_pump_on():
 
-        print("pump_on state change")
+        dbg_print("pump_on state change")
         # update state variables
         PUMP_STATE = 1
         PUMP_ON_TIME = datetime.now()
@@ -133,10 +144,10 @@ def pump_off(trigger):
 
     global PUMP_STATE, PUMP_OFF_TIME, DB_CUR, DB_CONN
 
-    print("pump_off() called")
+    dbg_print("pump_off() called")
     # verify that inhibit critera are not met
     if not inhibit_pump_off():
-        print("pump_off state change")
+        dbg_print("pump_off state change")
 
         # update state variables
         PUMP_STATE = 0
@@ -283,7 +294,8 @@ def update_schedule():
     global SCHED_LOAD_TIME
     global SCHED_TRIGGER_TEMP 
     global SCHED_MIN_OFF_TIME 
-    global SCHED_PUMP_ON_TIME 
+    global SCHED_PUMP_ON_TIME
+    global SCHED_SAMPLE_INTVL
 
     # if we need to reload the schedule from file
     reload_sched = False
@@ -310,14 +322,18 @@ def update_schedule():
     SCHED_TRIGGER_TEMP = select['set_temp'].iloc[0]
     SCHED_MIN_OFF_TIME = select['min_off_time'].iloc[0]
     SCHED_PUMP_ON_TIME = select['on_time'].iloc[0]
+    SCHED_SAMPLE_INTVL = select['sample_interval'].iloc[0]
 
 
 def debug_print_state():
     global PUMP_STATE, FAULT_IND
     global PUMP_ON_TIME, PUMP_OFF_TIME, INIT_TIME, CURR_TEMP
     global SCHED_LOAD_TIME, SCHED_MIN_OFF_TIME, SCHED_PUMP_ON_TIME
-    global SCHED_TRIGGER_TEMP
+    global SCHED_TRIGGER_TEMP, DEBUG_PRINT, SCHED_SAMPLE_INTVL
 
+    if not DEBUG_PRINT:
+        return
+    
     print("\nState Variables:")
     print("  PUMP_STATE: {:}".format(PUMP_STATE))
     print("  FAULT_IND: {:}".format(FAULT_IND))
@@ -331,6 +347,7 @@ def debug_print_state():
     print("  SCHED_MIN_OFF_TIME: {:}".format(SCHED_MIN_OFF_TIME))
     print("  SCHED_PUMP_ON_TIME: {:}".format(SCHED_PUMP_ON_TIME))
     print("  SCHED_TRIGGER_TEMP: {:}".format(SCHED_TRIGGER_TEMP))
+    print("  SCHED_SAMPLE_INTVL: {:}".format(SCHED_SAMPLE_INTVL))
   
 
 # Iterrupt callback function
@@ -347,7 +364,7 @@ try:
     # set state to pump_off after initialization
     pump_off(4)
     fault_off(4)
-    print("Initialization Complete.  Beginning loop.")
+    dbg_print("Initialization Complete.  Beginning loop.")
 
     while True:
         update_schedule()
@@ -364,7 +381,7 @@ try:
                 pump_off(3)
 
         # sleep for 30s
-        time.sleep(5) 
+        time.sleep(SCHED_SAMPLE_INTVL) 
 
 except KeyboardInterrupt:
     pass
