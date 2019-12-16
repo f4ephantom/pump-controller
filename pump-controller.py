@@ -108,11 +108,19 @@ def push_state():
     GPIO.output(PIN_FLTI,FAULT_IND)
 
 # State change routines 
-def pump_on(trigger):
+def pump_on(trigger,myDBcon=None,myDBcur=None):
     """Called when state change to pump_on has been triggered"""
 
     global PUMP_STATE, PUMP_ON_TIME,DB_CUR,DB_CONN
     dbg_print("pump_on() called")
+
+    if myDBcon == None:
+        theDBcur = DB_CUR
+        theDBcon = DB_CONN
+    else:
+        theDBcur = myDBcur
+        theDBcon = myDBcon
+
     # verify that inhibit critera are not met
     if not inhibit_pump_on():
 
@@ -125,9 +133,9 @@ def pump_on(trigger):
         # Is not working when called from interrupt because the process is 
         # different and a new sqlite connection object is needed
         try:
-            DB_CUR.execute('INSERT INTO statechanges (time,'\
+            theDBcur.execute('INSERT INTO statechanges (time,'\
               'new_state,cause) values (?,?,?)',(datetime.now(),2,trigger))
-            DB_CONN.commit()
+            theDBcon.commit()
         except:
             print("ERROR: Failed to add entry to database")
 
@@ -355,7 +363,11 @@ def debug_print_state():
 # Iterrupt callback function
 def override_callback(channel):
     """Trigger a pump_on state change request when button pressed"""
-    pump_on(2)
+    # inside a callback, I'm in a different thread, so I have to open
+    # a new database connection
+    myDBcon = sqlite3.connect('/home/pi/pump-controller/database.sq3')
+    myDBcur = myDBcon.cursor()
+    pump_on(2,myDBcon,myDBcur)
 
 # register the interrupt pin and callback function
 GPIO.add_event_detect(PIN_OVRR, GPIO.FALLING, callback=override_callback, 
