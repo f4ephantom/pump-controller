@@ -136,6 +136,8 @@ def pump_on(trigger,myDBcon=None,myDBcur=None):
             theDBcur.execute('INSERT INTO statechanges (time,'\
               'new_state,cause) values (?,?,?)',(datetime.now(),2,trigger))
             theDBcon.commit()
+        except KeyboardInterrupt:
+            raise 
         except:
             print("ERROR: Failed to add entry to database")
 
@@ -167,6 +169,8 @@ def pump_off(trigger):
             DB_CUR.execute('INSERT INTO statechanges (time,'\
               'new_state,cause) values (?,?,?)',(datetime.now(),1,trigger))
             DB_CONN.commit()
+        except KeyboardInterrupt:
+            raise
         except:
             print("ERROR: Failed to add entry to database")
 
@@ -208,6 +212,8 @@ def fault_on(trigger):
         DB_CUR.execute('INSERT INTO statechanges (time,'\
           'new_state,cause) values (?,?,?)',(datetime.now(),4,trigger))
         DB_CONN.commit()
+    except KeyboardInterrupt:
+        raise
     except:
         print("ERROR: Failed to add entry to database")
 
@@ -226,6 +232,8 @@ def fault_off(trigger):
         DB_CUR.execute('INSERT INTO statechanges (time,'\
           'new_state,cause) values (?,?,?)',(datetime.now(),3,trigger))
         DB_CONN.commit()
+    except KeyboardInterrupt:
+        raise
     except:
         print("ERROR: Failed to add entry to database")
 
@@ -271,6 +279,9 @@ def read_temp():
             print(lines)
             raise ValueError
             
+    except KeyboardInterrupt:
+        dbg_print("KeyboardInterrupt in temperature block")
+        raise
     except:
         # If there's an error, set temperature high enough to shut off pump
         # and set the fault indicator
@@ -288,6 +299,8 @@ def read_temp():
         DB_CUR.execute('INSERT INTO measurements (sensor_id,time,value) '\
           'values (?,?,?)',(1,datetime.now(),CURR_TEMP))
         DB_CONN.commit()
+    except KeyboardInterrupt:
+        raise
     except:
         print("ERROR: Failed to add entry to database")
 
