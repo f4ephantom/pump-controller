@@ -329,9 +329,9 @@ def debug_print_state():
     global PUMP_STATE, FAULT_IND
     global PUMP_ON_TIME, PUMP_OFF_TIME, INIT_TIME, CURR_TEMP
     global SCHED_LOAD_TIME, SCHED_MIN_OFF_TIME, SCHED_PUMP_ON_TIME
-    global SCHED_TRIGGER_TEMP, DEBUG_PRINT, SCHED_SAMPLE_INTVL
+    global SCHED_TRIGGER_TEMP, PRINT_DBG, SCHED_SAMPLE_INTVL
 
-    if not DEBUG_PRINT:
+    if not PRINT_DBG:
         return
     
     print("\nState Variables:")
