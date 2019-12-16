@@ -54,7 +54,7 @@ SCHED_TRIGGER_TEMP = None
 SCHED_SAMPLE_INTVL = None
 
 # Initialize the data logging database
-DB_CONN = sqlite3.connect('database.sq3')
+DB_CONN = sqlite3.connect('/home/pi/pump-controller/database.sq3')
 DB_CUR = DB_CONN.cursor()
 
 # if DB has not been initialized, prepare it for use
@@ -63,7 +63,8 @@ SELECT count(name)
 FROM sqlite_master 
 WHERE type='table' AND name='sensors'""")
 if DB_CUR.fetchone()[0] != 1:
-    DB_CUR = DB_CONN.executescript(open('schema.sql','r').read())
+    DB_CUR = DB_CONN.executescript(open(
+        '/home/pi/pump-controller/schema.sql','r').read())
 
     # populate sensor table
     DB_CUR.execute('insert into sensors (id,description) '\
@@ -305,7 +306,8 @@ def update_schedule():
         reload_sched = True
 
     if reload_sched:
-        SCHED = pd.read_csv('schedule.txt',delim_whitespace=True)
+        SCHED = pd.read_csv('/home/pi/pump-controller/schedule.txt',
+                delim_whitespace=True)
         SCHED_LOAD_TIME = datetime.now()
         SCHED['start_time'] = pd.to_datetime(SCHED['start_time'].str.strip(),
                                              format='%H:%M:%S')
