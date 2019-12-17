@@ -8,7 +8,7 @@ db = sqlite3.connect('database.sq3')
 query = """
 SELECT measurements.time, measurements.value
 FROM measurements
-WHERE measurements.time > datetime('now','-1 day');
+WHERE measurements.time > datetime('now','-1 days');
 """
 
 df = pd.read_sql_query(query,db)
